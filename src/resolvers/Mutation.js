@@ -1,61 +1,31 @@
 import uuidv4 from 'uuid/v4';
 
 const Mutation = {
-  createUser(parent, { data }, { db }, info) {
-    const { name, email, age } = data;
-    const isUserTaken = db.users.some(user => user.email === email);
+  async createUser(parent, { data }, { prisma }, info) {
+    const { email } = data;
 
-    if (isUserTaken) throw new Error('Email is taken');
+    const isEmailTaken = await prisma.exists.User({ email });
+    if (isEmailTaken) throw new Error('The email is already taken');
 
-    const user = {
-      id: uuidv4(),
-      name,
-      email,
-      age
-    };
-
-    db.users.push(user);
-    return user;
+    return prisma.mutation.createUser({ data }, info);
   },
 
-  deleteUser(parent, { id }, { db }, info) {
-    const userIndex = db.users.findIndex(user => user.id === id);
+  async deleteUser(parent, { data }, { prisma }, info) {
+    const { id } = data;
 
-    if (userIndex === -1) throw new Error('User not found');
+    const userExists = prisma.exists.User({ id });
+    if (!userExists) throw new Error('User not found');
 
-    const [deletedUser] = db.users.splice(userIndex, 1);
-
-    db.posts = db.posts.filter(post => {
-      const match = post.author === id;
-
-      if (match) db.comments = db.comments.filter(comment => comment.post !== post.id);
-
-      return !match;
-    });
-
-    db.comments = db.comments.filter(comment => comment.author !== id);
-
-    return deletedUser;
+    return prisma.mutation.deleteUser({ where: { id } }, info);
   },
 
-  updateUser(parent, { id, data }, { db }, info) {
-    const { name, email, age } = data;
-    const user = db.users.find(user => user.id === id);
+  async updateUser(parent, { data }, { prisma }, info) {
+    const { id } = data;
 
-    if (!user) throw new Error('User not found');
+    const userExists = prisma.exists.User({ id });
+    if (!userExists) throw Error('User not found');
 
-    if (email) {
-      const isEmailTaken = db.users.some(user => user.email === email);
-
-      if (isEmailTaken) throw new Error('Email is already taken');
-
-      user.email = email;
-    }
-
-    if (name) user.name = name;
-    if (age !== undefined) user.age = age;
-
-    return user;
+    return prisma.User.updateUser({ where: { id }, data }, info);
   },
 
   createPost(parent, { data }, { db, pubsub }, info) {
